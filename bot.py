@@ -1,16 +1,60 @@
 import os
 from dotenv import load_dotenv
 from tavily import TavilyClient
+from openai import OpenAI
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
+load_dotenv()
 
-
-TELEGRAM_TOKEN = ("8280654091:AAEGSFUttxnArFHEVnlYDDayV96bXdj5DVM")
-TAVILY_API_KEY = ("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")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+def make_summary(query, results):
+    sources_text = ""
+
+    for index, item in enumerate(results, start=1):
+        title = item.get("title", "")
+        url = item.get("url", "")
+        content = item.get("content", "")
+
+        sources_text += f"""
+Источник {index}
+Заголовок: {title}
+Ссылка: {url}
+Текст: {content}
+"""
+
+    prompt = f"""
+Ты аналитический помощник для Product/Project Manager.
+
+Пользователь спросил:
+{query}
+
+Вот результаты поиска:
+{sources_text}
+
+Сделай ответ на русском:
+1. Краткая суть
+2. 3–5 ключевых фактов
+3. Почему это важно
+4. Ссылки на источники
+
+Не выдумывай факты. Используй только данные из результатов поиска.
+"""
+
+    response = openai_client.responses.create(
+        model="gpt-4.1-mini",
+        input=prompt
+    )
+
+    return response.output_text
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
