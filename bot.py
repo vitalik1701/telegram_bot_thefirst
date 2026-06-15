@@ -2,6 +2,9 @@ import os
 from dotenv import load_dotenv
 from tavily import TavilyClient
 from openai import OpenAI
+import gspread
+from datetime import datetime
+
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
@@ -14,6 +17,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
+gc = gspread.service_account(filename="credentials.json")
+
+sheet = gc.open_by_url("https://docs.google.com/spreadsheets/d/1M1lJJpHO3RHAudwDZsXQhA29thWT6EbxWwsbcyWwVPY/edit?usp=sharing").sheet1
 
 
 def make_summary(query, results):
@@ -107,10 +113,27 @@ async def news(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as error:
         await update.message.reply_text(f"Ошибка при поиске: {error}")
 
+async def expense(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "Напиши так:\n/expense кофе 350"
+        )
+        return
 
+    category = context.args[0]
+    amount = context.args[1]
+
+    date = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    sheet.append_row([date, category, amount])
+
+    await update.message.reply_text(
+        f"Расход добавлен ✅\n\nКатегория: {category}\nСумма: {amount}"
+    )
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CommandHandler("news", news))
+app.add_handler(CommandHandler("expense", expense))
 
 app.run_polling()
